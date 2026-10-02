@@ -585,6 +585,12 @@
     );
   }
 
+  function openHero(crumbHtml, product, mode) {
+    const block = heroBlock(product, mode);
+    if (!product || product.theme !== "dark") return crumbHtml + block;
+    return '<div class="hero-stack">' + crumbHtml + block + "</div>";
+  }
+
   function specs(product) {
     if (!product.specs || !product.specs.length) return "";
     const cells = product.specs
@@ -680,8 +686,7 @@
       })
       .join("");
     return (
-      crumb([["Home", "#/"], ["Your match", ""]]) +
-      heroBlock(product, "result") +
+      openHero(crumb([["Home", "#/"], ["Your match", ""]]), product, "result") +
       '<section class="section"><h2>Why this one.</h2><div class="why-grid">' +
       reasons +
       "</div>" +
@@ -707,12 +712,15 @@
     const family = CATALOG[product.category] ? CATALOG[product.category][0] : "Products";
     const hash = CATALOG[product.category] ? "#/" + product.category : "#/";
     return (
-      crumb([
-        ["Home", "#/"],
-        [family, hash],
-        [product.name, ""],
-      ]) +
-      heroBlock(product, "product") +
+      openHero(
+        crumb([
+          ["Home", "#/"],
+          [family, hash],
+          [product.name, ""],
+        ]),
+        product,
+        "product"
+      ) +
       '<section class="section"><h2>The short version.</h2><div class="why-grid"><div><h3>What it’s for</h3><p>' +
       esc(product.pitch) +
       "</p></div><div><h3>Choose it if</h3><p>" +

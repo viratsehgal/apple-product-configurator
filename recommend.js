@@ -97,6 +97,13 @@
         "It starts at " +
         money(product.price) +
         ". That is the match for what you described, not simply the most expensive model.";
+    } else if (band && !inBand(product.price, band)) {
+      priceBody =
+        "It starts at " +
+        money(product.price) +
+        ". That’s just outside the range you set, and it’s the closest " +
+        (product.kind === "macbook" ? "laptop" : "desktop") +
+        " for how you said you’d use it.";
     } else if (band) {
       priceBody =
         "At " +
@@ -124,8 +131,37 @@
     ];
   }
 
+  function macShape(product) {
+    if (!product || product.category !== "mac") return "";
+    if (product.kind === "macbook") return "laptop";
+    if (product.kind === "imac" || product.kind === "mini" || product.kind === "studio") return "desktop";
+    return "";
+  }
+
+  function preferredShape(answers) {
+    if (!answers || answers.category !== "mac") return "";
+    const extras = answers.extras || [];
+    if (answers.place === "mobile") return "laptop";
+    if (answers.place === "desk") return "desktop";
+    if (extras.indexOf("light") >= 0) return "laptop";
+    if (answers.place === "mix" || extras.indexOf("ports") >= 0) {
+      return extras.indexOf("ports") >= 0 ? "desktop" : "laptop";
+    }
+    return "";
+  }
+
+  function closestToBand(rows, band) {
+    function distance(price) {
+      if (band.max != null && price > band.max) return price - band.max;
+      if (price < band.min) return (band.min - price) * 0.35;
+      return 0;
+    }
+    const sorted = rows.slice().sort((a, b) => distance(a.p.price) - distance(b.p.price) || b.score - a.score);
+    const nearest = distance(sorted[0].p.price);
+    return sorted.filter((row) => distance(row.p.price) <= nearest + 120);
+  }
+
   function buildRecommendation(answers) {
-    const flow = Data.getFlow(answers);
     const band = selectedOptions(findStep(answers, "budget"), answers)[0];
     const category = answers.category;
     const pool = Data.products.filter((p) => {
@@ -144,17 +180,28 @@
 
     let shortlist = ranked;
     let overBudget = false;
+    const shape = preferredShape(answers);
+    const shaped = shape ? ranked.filter((row) => macShape(row.p) === shape) : [];
+    const candidates = shaped.length ? shaped : ranked;
+
     if (band && !band.soft) {
-      const inside = ranked.filter((row) => inBand(row.p.price, band));
+      const inside = candidates.filter((row) => inBand(row.p.price, band));
       if (inside.length) shortlist = inside;
-      else overBudget = true;
+      else if (shaped.length) {
+        shortlist = closestToBand(shaped, band).sort((a, b) => b.score - a.score);
+        overBudget = band.max != null && shortlist[0].p.price > band.max;
+      } else {
+        overBudget = true;
+      }
+    } else if (shaped.length) {
+      shortlist = shaped;
     }
 
     const winner = shortlist[0];
     const alternatives = shortlist.slice(1, 3);
     let stretch = null;
     if (winner && band && !band.soft && !overBudget) {
-      const aspirational = ranked.find(
+      const aspirational = (shaped.length ? shaped : ranked).find(
         (row) =>
           row.p.id !== winner.p.id &&
           row.p.price > winner.p.price + 80 &&
